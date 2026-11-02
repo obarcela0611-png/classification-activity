@@ -21,6 +21,7 @@ select { width: 100%; padding: 6px; background: var(--bg); color: var(--fg); bor
 main { padding: 24px 32px 64px; max-width: 1100px; min-width: 0; }
 h1 { margin: 0 0 4px; }
 h2 { margin: 28px 0 4px; }
+h3 { margin: 20px 0 6px; }
 .caption { color: var(--muted); font-size: 13.5px; margin: 14px 0 6px; }
 .box { border: 1px solid var(--line); border-radius: 8px; padding: 4px 16px 8px; }
 .box h2 { margin-top: 12px; font-size: 1.15rem; }
@@ -33,6 +34,11 @@ thead th { background: var(--panel); }
 tbody th { font-weight: 600; }
 td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.matrix-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin: 8px 0 20px; }
+.matrix-card { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; min-width: 0; }
+.matrix-card h3 { margin: 0 0 2px; font-size: 1rem; }
+.matrix-card table { width: 100%; margin-bottom: 0; }
+.matrix-card .caption { margin-top: 2px; }
 svg { width: 100%; height: auto; display: block; overflow: visible; }
 svg text { fill: var(--muted); font-size: 12px; }
 svg .axis { stroke: var(--line); }
