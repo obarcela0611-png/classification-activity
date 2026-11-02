@@ -1,5 +1,5 @@
 {
-  "exported_at": "2026-11-02T02:03:41Z",
+  "exported_at": "2026-11-02T02:34:44Z",
   "words": 70,
   "word_limit": 150,
   "sections": {
@@ -8,8 +8,8 @@
       "diabetes": "The positive class is patients with a diabetes diagnosis or HbA1c ≥ 6.5%. Missing a positive matters more because it could delay further testing, diagnosis, and treatment for patients who may have diabetes."
     },
     "recommendations": {
-      "readmission": "",
-      "diabetes": ""
+      "readmission": "None is adequate for this job because the models either miss too many patients who are readmitted or generate too many false alarms. Random forest also shows substantial overfitting.",
+      "diabetes": "I chose logistic regression with a threshold of 0.20 because it catches 155 out of 200 patients with diabetes (77.5% sensitivity), while generating 235 false alarms. I consider this tradeoff acceptable for identifying patients who may need additional testing."
     },
     "design": {
       "design_choice": "",
@@ -18,11 +18,11 @@
   },
   "complete": {
     "before_results": true,
-    "recommendations": false,
+    "recommendations": true,
     "design": false
   },
   "recommendations": {
-    "readmission": "",
-    "diabetes": ""
+    "readmission": "None is adequate for this job because the models either miss too many patients who are readmitted or generate too many false alarms. Random forest also shows substantial overfitting.",
+    "diabetes": "I chose logistic regression with a threshold of 0.20 because it catches 155 out of 200 patients with diabetes (77.5% sensitivity), while generating 235 false alarms. I consider this tradeoff acceptable for identifying patients who may need additional testing."
   }
 }
