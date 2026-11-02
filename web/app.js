@@ -8,6 +8,10 @@ const SECTIONS = [
   "2. A Threshold for the Job",
   "3. Training vs. Test"
 ];
+const POSITIVE_CLASS = {
+  readmission: "readmitted to the hospital within 30 days",
+  diabetes: "doctor diagnosis of diabetes or HbA1c at least 6.5%"
+};
 
 const $ = (id) => document.getElementById(id);
 
@@ -41,9 +45,6 @@ async function load(name) {
 const caption = (text) =>
   `<p class="caption">${esc(text)}</p>`;
 
-const starterNote = (text) =>
-  `<p class="info">Starter display: ${esc(text)} Build this section up to its required minimum.</p>`;
-
 function table(rows) {
   const cols = Object.keys(rows[0]);
 
@@ -67,6 +68,20 @@ function table(rows) {
     .join("");
 
   return `<div class="table-wrap"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+}
+
+function confusionMatrix(c, label, thresholdLabel = "0.50") {
+  return `<div class="matrix-card">
+    <h3>${esc(label)}</h3>
+    <p class="caption">${TEST} · threshold ${esc(thresholdLabel)} · rows are actual, columns are predicted</p>
+    <table class="matrix">
+      <thead><tr><th scope="col">Actual ↓ / Predicted →</th><th scope="col">Positive</th><th scope="col">Negative</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Positive</th><td class="num">${int(c.tp)} TP</td><td class="num">${int(c.fn)} FN</td></tr>
+        <tr><th scope="row">Negative</th><td class="num">${int(c.fp)} FP</td><td class="num">${int(c.tn)} TN</td></tr>
+      </tbody>
+    </table>
+  </div>`;
 }
 
 async function recommendations() {
@@ -96,10 +111,43 @@ function beyondAccuracy(res, model) {
   const [p, y] = m11.preds(res, model);
   const c = m11.confusion(p, y, 0.5);
   const m = m11.metrics(c);
+  const prevalence = y.filter((v) => v === 1).length / y.length;
+  const baselineAccuracy = m11.majorityAccuracy(y);
 
-  return caption(
-    `${TEST} · ${m11.MODEL_LABEL[model]}, threshold 0.50`
-  ) +
+  const comparisons = Object.keys(res.models).map((key) => {
+    const [modelP, modelY] = m11.preds(res, key);
+    const modelC = m11.confusion(modelP, modelY, 0.5);
+    const modelM = m11.metrics(modelC);
+    return {
+      Model: m11.MODEL_LABEL[key],
+      Accuracy: m11.fmtPct(modelM.accuracy),
+      Sensitivity: m11.fmtPct(modelM.sensitivity),
+      Specificity: m11.fmtPct(modelM.specificity),
+      FPR: m11.fmtPct(modelM.fpr),
+      Precision: m11.fmtPct(modelM.precision),
+      F1: m11.fmtPct(modelM.f1)
+    };
+  });
+
+  const matrices = Object.keys(res.models)
+    .map((key) => {
+      const [modelP, modelY] = m11.preds(res, key);
+      return confusionMatrix(
+        m11.confusion(modelP, modelY, 0.5),
+        m11.MODEL_LABEL[key]
+      );
+    })
+    .join("");
+
+  return `<p><strong>Positive class:</strong> patients who were ${esc(POSITIVE_CLASS[state.key])}.</p>
+    <p><strong>${TEST} prevalence:</strong> ${m11.fmtPct(prevalence)}. The most-common-class baseline accuracy is <strong>${m11.fmtPct(baselineAccuracy)}</strong>. A model can look accurate by mostly predicting the common negative class while missing patients with the outcome.</p>
+    <h3>Selected model</h3>` +
+    confusionMatrix(c, m11.MODEL_LABEL[model]) +
+    `<p><strong>Sensitivity:</strong> of the patients with the outcome, ${m11.fmtPct(m.sensitivity)} were flagged.</p>
+    <p><strong>Specificity:</strong> of the patients without the outcome, ${m11.fmtPct(m.specificity)} were not flagged.</p>
+    <p><strong>Precision:</strong> of the patients flagged, ${m11.fmtPct(m.precision)} had the outcome.</p>
+    <h3>All models at 0.50</h3>
+    <p class="caption">${TEST} · every model · threshold 0.50</p>` +
     table([
       {
         TP: int(c.tp),
@@ -113,7 +161,10 @@ function beyondAccuracy(res, model) {
         Precision: m11.fmtPct(m.precision),
         F1: m11.fmtPct(m.f1)
       }
-    ]);
+    ]) +
+    `<div class="matrix-grid">${matrices}</div>` +
+    `<p class="caption">${TEST} · comparison of all five models at threshold 0.50</p>` +
+    table(comparisons);
 }
 
 // ----------------------------------------------------
@@ -147,7 +198,12 @@ function threshold(res, model) {
       <input id="threshold-slider" type="range" min="0" max="1" step="0.01" value="${state.threshold}">
       <output for="threshold-slider">${state.threshold.toFixed(2)}</output>
     </label>
-    <p class="caption">Lower thresholds flag more patients and usually catch more of the patients with the outcome, but also create more false alarms. All values below use ${TEST.toLowerCase()} patients.</p>
+    <p class="caption">Lower thresholds flag more patients and usually catch more of the patients with the outcome, but also create more false alarms. Changing the threshold does not change any predicted probability or AUROC; it only changes which patients are flagged.</p>
+    <p class="caption">${TEST} · ${m11.MODEL_LABEL[model]} · selected threshold compared with 0.50</p>
+    <div class="matrix-grid">
+      ${confusionMatrix(selectedC, `${state.threshold.toFixed(2)} selected`, state.threshold.toFixed(2))}
+      ${confusionMatrix(referenceC, "0.50 reference")}
+    </div>
   ` +
     table([
       row(`${state.threshold.toFixed(2)} (selected)`, selectedC, selected),
