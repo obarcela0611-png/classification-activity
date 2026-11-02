@@ -24,7 +24,8 @@ const int = (n) => n.toLocaleString("en-US");
 const state = {
   section: SECTIONS[0],
   key: "readmission",
-  model: "logreg"
+  model: "logreg",
+  threshold: 0.5
 };
 
 const cache = {};
@@ -121,19 +122,36 @@ function beyondAccuracy(res, model) {
 
 function threshold(res, model) {
   const [p, y] = m11.preds(res, model);
-  const m = m11.metrics(m11.confusion(p, y, 0.5));
+  const selectedC = m11.confusion(p, y, state.threshold);
+  const referenceC = m11.confusion(p, y, 0.5);
+  const selected = m11.metrics(selectedC);
+  const reference = m11.metrics(referenceC);
 
-  return starterNote("metrics at 0.50 only.") +
-    caption(
-      `${TEST} · ${m11.MODEL_LABEL[model]}, threshold 0.50`
-    ) +
+  const row = (label, c, m) => ({
+    Threshold: label,
+    TP: int(c.tp),
+    FN: int(c.fn),
+    FP: int(c.fp),
+    TN: int(c.tn),
+    Sensitivity: m11.fmtPct(m.sensitivity),
+    Specificity: m11.fmtPct(m.specificity),
+    Precision: m11.fmtPct(m.precision),
+    "False Positive Rate": m11.fmtPct(m.fpr),
+    F1: m11.fmtPct(m.f1),
+    "Flagged per 100": m11.fmtNum(m.flagged_per_100, 1)
+  });
+
+  return `
+    <label class="slider" for="threshold-slider">
+      <span>Decision threshold</span>
+      <input id="threshold-slider" type="range" min="0" max="1" step="0.01" value="${state.threshold}">
+      <output for="threshold-slider">${state.threshold.toFixed(2)}</output>
+    </label>
+    <p class="caption">Lower thresholds flag more patients and usually catch more of the patients with the outcome, but also create more false alarms. All values below use ${TEST.toLowerCase()} patients.</p>
+  ` +
     table([
-      {
-        Sensitivity: m11.fmtPct(m.sensitivity),
-        Specificity: m11.fmtPct(m.specificity),
-        Precision: m11.fmtPct(m.precision),
-        "Flagged per 100": m.flagged_per_100.toFixed(1)
-      }
+      row(`${state.threshold.toFixed(2)} (selected)`, selectedC, selected),
+      row("0.50 (reference)", referenceC, reference)
     ]);
 }
 
@@ -147,15 +165,14 @@ function trainVsTest(res) {
   const rows = Object.entries(s).map(([m, v]) => ({
     Model: m11.MODEL_LABEL[m],
     [`${TRAIN} AUROC`]: m11.fmtNum(v.train),
-    [`${TEST} AUROC`]: m11.fmtNum(v.test)
+    [`${TEST} AUROC`]: m11.fmtNum(v.test),
+    "Training − Test gap": m11.fmtNum(v.gap)
   }));
 
-  return starterNote(
-    "training and test AUROC of every model, in a table."
-  ) +
-    caption(
-      `${TRAIN} and ${TEST} · AUROC on the rows each model learned from, and on rows it never saw`
+  return caption(
+      `${TRAIN} and ${TEST} · AUROC compares how well each model ranks patients with the outcome above patients without it.`
     ) +
+    `<p class="caption">${TRAIN} results use patients the model learned from and can be overly flattering. ${TEST} results use patients it never saw. A large positive gap is a warning that the model may have memorised patterns that do not carry over.</p>` +
     table(rows);
 }
 
@@ -201,6 +218,18 @@ async function render() {
     model in res.models
       ? RENDER[section](res, model)
       : `<p class="warn">${esc(m11.MODEL_LABEL[model])} has no results yet: run <code>python -m analysis</code>, then commit and push <code>results/</code>.</p>`;
+
+  bindThresholdSlider(res, model, content);
+}
+
+function bindThresholdSlider(res, model, content) {
+  const slider = $("threshold-slider");
+  if (!slider) return;
+  slider.addEventListener("input", (e) => {
+    state.threshold = Number(e.target.value);
+    content.innerHTML = threshold(res, model);
+    bindThresholdSlider(res, model, content);
+  });
 }
 
 // ----------------------------------------------------
